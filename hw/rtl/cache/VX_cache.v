@@ -162,6 +162,51 @@ module VX_cache #(
 
     ///////////////////////////////////////////////////////////////////////////
 
+    wire                             bypass_dram_req_rw;
+    wire                             bypass_dram_req_valid;
+    wire [CACHE_LINE_SIZE-1:0]       bypass_dram_req_byteen;
+    wire [`DRAM_ADDR_WIDTH-1:0]      bypass_dram_req_addr;
+    wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_req_data;
+    wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_req_tag;
+
+    VX_cache_bypass #(
+    // .CACHE_ID(CACHE_ID),
+    .NUM_REQS(NUM_REQS),
+    .CACHE_SIZE(CACHE_SIZE),
+    .CACHE_LINE_SIZE(CACHE_LINE_SIZE),
+    .NUM_BANKS(NUM_BANKS),
+    // .NUM_PORTS(NUM_PORTS),
+    // .WORD_SIZE(WORD_SIZE),
+    // .CREQ_SIZE(CREQ_SIZE),
+    // .MSHR_SIZE(MSHR_SIZE),
+    // .DRSQ_SIZE(DRSQ_SIZE),
+    // .DREQ_SIZE(DREQ_SIZE),
+    // .WRITE_ENABLE(WRITE_ENABLE),
+    // .CORE_TAG_WIDTH(CORE_TAG_WIDTH),
+    // .CORE_TAG_ID_BITS(CORE_TAG_ID_BITS),
+    .DRAM_TAG_WIDTH(DRAM_TAG_WIDTH)
+    // .BANK_ADDR_OFFSET(BANK_ADDR_OFFSET),
+    // .IN_ORDER_DRAM(IN_ORDER_DRAM)
+    ) cache_bypass (
+        .clk       (clk),
+        .reset     (reset),
+        .flush     (flush),
+        .bypass_dram_req_rw(bypass_dram_req_rw),
+        .bypass_dram_req_valid(bypass_dram_req_valid),
+        .bypass_dram_req_byteen(bypass_dram_req_byteen),
+        .bypass_dram_req_addr(bypass_dram_req_addr),
+        .bypass_dram_req_data(bypass_dram_req_data),
+        .bypass_dram_req_tag(bypass_dram_req_tag),
+        .dram_req_valid(dram_req_valid),
+        .dram_req_rw(dram_req_rw),
+        .dram_req_byteen(dram_req_byteen),
+        .dram_req_addr(dram_req_addr),
+        .dram_req_data(dram_req_data),
+        .dram_req_tag(dram_req_tag)
+    );
+
+    ///////////////////////////////////////////////////////////////////////////
+
     VX_flush_ctrl #( 
         .CACHE_SIZE (CACHE_SIZE),
         .CACHE_LINE_SIZE (CACHE_LINE_SIZE),
@@ -388,12 +433,12 @@ module VX_cache #(
         .valid_in  (per_bank_dram_req_valid),
         .data_in   (data_in),
         .ready_in  (per_bank_dram_req_ready),   
-        .valid_out (dram_req_valid),   
-        .data_out  ({dram_req_addr, dram_req_rw, dram_req_byteen, dram_req_data}),
+        .valid_out (bypass_dram_req_valid),   
+        .data_out  ({bypass_dram_req_addr, bypass_dram_req_rw, bypass_dram_req_byteen, bypass_dram_req_data}),
         .ready_out (dram_req_ready)
     );
 
-    assign dram_req_tag = dram_req_addr;
+    assign bypass_dram_req_tag = bypass_dram_req_addr;
 
 `ifdef PERF_ENABLE
     // per cycle: core_reads, core_writes
