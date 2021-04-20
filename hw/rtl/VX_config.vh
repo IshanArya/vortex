@@ -52,7 +52,11 @@
 `endif
 
 `ifndef SHARED_MEM_BASE_ADDR
-`define SHARED_MEM_BASE_ADDR `IO_BUS_BASE_ADDR
+`define SHARED_MEM_BASE_ADDR `IO_BUS_BASE_ADDR // address moves downward (since it's a stack)
+`endif
+
+`ifndef DIRECT_MEM_BASE_ADDR
+`define DIRECT_MEM_BASE_ADDR `SHARED_MEM_BASE_ADDR //+ `SMEM_SIZE
 `endif
 
 `ifndef SHARED_MEM_BASE_ADDR_ALIGN

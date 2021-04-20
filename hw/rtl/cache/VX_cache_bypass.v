@@ -16,13 +16,13 @@ module VX_cache_bypass #(
     parameter NUM_BANKS                     = NUM_REQS,
     // // Number of ports per banks
     // parameter NUM_PORTS                     = 1,
-    // // Size of a word in bytes
-    // parameter WORD_SIZE                     = 4, 
+    // Size of a word in bytes
+    parameter WORD_SIZE                     = 4, 
 
     // // Core Request Queue Size
     // parameter CREQ_SIZE                     = 4, 
-    // // Miss Reserv Queue Knob
-    // parameter MSHR_SIZE                     = 8, 
+    // Miss Reserv Queue Knob
+    parameter MSHR_SIZE                     = 8, 
     // // DRAM Response Queue Size
     // parameter DRSQ_SIZE                     = 4,
     // // DRAM Request Queue Size
@@ -31,11 +31,11 @@ module VX_cache_bypass #(
     // // Enable cache writeable
     // parameter WRITE_ENABLE                  = 1,
 
-    // // core request tag size
-    // parameter CORE_TAG_WIDTH                = $clog2(MSHR_SIZE),
+    // core request tag size
+    parameter CORE_TAG_WIDTH                = $clog2(MSHR_SIZE),
     
-    // // size of tag id in core request tag
-    // parameter CORE_TAG_ID_BITS              = CORE_TAG_WIDTH,
+    // size of tag id in core request tag
+    parameter CORE_TAG_ID_BITS              = CORE_TAG_WIDTH,
 
     // dram request tag size
     parameter DRAM_TAG_WIDTH                = (32 - $clog2(CACHE_LINE_SIZE))
@@ -54,6 +54,37 @@ module VX_cache_bypass #(
     input wire  reset,
     input wire  flush,
 
+    // Core request
+    output wire [NUM_REQS-1:0]                           bypass_core_req_valid,
+    output wire [NUM_REQS-1:0]                           bypass_core_req_rw,
+    output wire [NUM_REQS-1:0][`WORD_ADDR_WIDTH-1:0]     bypass_core_req_addr,
+    output wire [NUM_REQS-1:0][WORD_SIZE-1:0]            bypass_core_req_byteen,
+    output wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]          bypass_core_req_data,
+    output wire [NUM_REQS-1:0][CORE_TAG_WIDTH-1:0]       bypass_core_req_tag,
+    input wire [NUM_REQS-1:0]                            bypass_core_req_ready,
+
+    input wire [NUM_REQS-1:0]                           core_req_valid,
+    input wire [NUM_REQS-1:0]                           core_req_rw,
+    input wire [NUM_REQS-1:0][`WORD_ADDR_WIDTH-1:0]     core_req_addr,
+    input wire [NUM_REQS-1:0][WORD_SIZE-1:0]            core_req_byteen,
+    input wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]          core_req_data,
+    input wire [NUM_REQS-1:0][CORE_TAG_WIDTH-1:0]       core_req_tag,
+    output wire [NUM_REQS-1:0]                          core_req_ready,
+
+
+    // Core response
+    input wire [NUM_REQS-1:0]                          bypass_core_rsp_valid,
+    input wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]         bypass_core_rsp_data,
+    input wire [`CORE_REQ_TAG_COUNT-1:0][CORE_TAG_WIDTH-1:0] bypass_core_rsp_tag,
+    output  wire [`CORE_REQ_TAG_COUNT-1:0]               bypass_core_rsp_ready,
+
+    output wire [NUM_REQS-1:0]                          core_rsp_valid,
+    output wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]         core_rsp_data,
+    output wire [`CORE_REQ_TAG_COUNT-1:0][CORE_TAG_WIDTH-1:0] core_rsp_tag,
+    input  wire [`CORE_REQ_TAG_COUNT-1:0]               core_rsp_ready,
+
+
+    // DRAM request
     input wire                             bypass_dram_req_rw,
     input wire                             bypass_dram_req_valid,
     input wire [CACHE_LINE_SIZE-1:0]       bypass_dram_req_byteen, 
@@ -68,11 +99,36 @@ module VX_cache_bypass #(
     output wire [`CACHE_LINE_WIDTH-1:0]     dram_req_data,
     output wire [DRAM_TAG_WIDTH-1:0]        dram_req_tag
 
+
+    // //DRAM Response
+    // output  wire                             bypass_dram_rsp_valid,    
+    // output  wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_rsp_data,
+    // output  wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_rsp_tag,
+    // input   wire                             bypass_dram_rsp_ready,
+
+    // input  wire                             dram_rsp_valid,    
+    // input  wire [`CACHE_LINE_WIDTH-1:0]     dram_rsp_data,
+    // input  wire [DRAM_TAG_WIDTH-1:0]        dram_rsp_tag,
+    // output wire                             dram_rsp_ready
+
 );
     // assigns here
     // example flush_ctrl
     reg flush_enable;
     reg [`LINE_SELECT_BITS-1:0] flush_ctr;
+
+    assign bypass_core_req_valid = core_req_valid;
+    assign bypass_core_req_rw = core_req_rw;
+    assign bypass_core_req_addr = core_req_addr;
+    assign bypass_core_req_byteen = core_req_byteen;
+    assign bypass_core_req_data = core_req_data;
+    assign bypass_core_req_tag = core_req_tag;
+    assign core_req_ready = bypass_core_req_ready;
+
+    assign core_rsp_valid = bypass_core_rsp_valid;
+    assign core_rsp_data = bypass_core_rsp_data;
+    assign core_rsp_tag = bypass_core_rsp_tag;
+    assign bypass_core_rsp_ready = core_rsp_ready;
 
     assign dram_req_valid = bypass_dram_req_valid;
     assign dram_req_rw = bypass_dram_req_rw;
@@ -80,6 +136,11 @@ module VX_cache_bypass #(
     assign dram_req_addr = bypass_dram_req_addr;
     assign dram_req_data = bypass_dram_req_data;
     assign dram_req_tag = bypass_dram_req_tag;
+
+    // assign bypass_dram_rsp_valid = dram_rsp_valid;
+    // assign bypass_dram_rsp_data = dram_rsp_data;
+    // assign bypass_dram_rsp_tag = dram_rsp_tag;
+    // assign dram_rsp_ready = bypass_dram_rsp_ready;
 
     always @(posedge clk) begin
         if (reset || flush) begin

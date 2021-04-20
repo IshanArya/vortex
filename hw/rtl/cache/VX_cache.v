@@ -51,7 +51,7 @@ module VX_cache #(
 
     input wire flush,
 
-    // Core request    
+    // Core request
     input wire [NUM_REQS-1:0]                           core_req_valid,
     input wire [NUM_REQS-1:0]                           core_req_rw,
     input wire [NUM_REQS-1:0][`WORD_ADDR_WIDTH-1:0]     core_req_addr,
@@ -61,10 +61,10 @@ module VX_cache #(
     output wire [NUM_REQS-1:0]                          core_req_ready,
 
     // Core response
-    output wire [NUM_REQS-1:0]                          core_rsp_valid,    
+    output wire [NUM_REQS-1:0]                          core_rsp_valid,
     output wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]         core_rsp_data,
     output wire [`CORE_REQ_TAG_COUNT-1:0][CORE_TAG_WIDTH-1:0] core_rsp_tag,
-    input  wire [`CORE_REQ_TAG_COUNT-1:0]               core_rsp_ready,   
+    input  wire [`CORE_REQ_TAG_COUNT-1:0]               core_rsp_ready,
 
     // PERF
 `ifdef PERF_ENABLE
@@ -169,6 +169,24 @@ module VX_cache #(
     wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_req_data;
     wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_req_tag;
 
+    wire [NUM_REQS-1:0]                           bypass_core_req_valid;
+    wire [NUM_REQS-1:0]                           bypass_core_req_rw;
+    wire [NUM_REQS-1:0][`WORD_ADDR_WIDTH-1:0]     bypass_core_req_addr;
+    wire [NUM_REQS-1:0][WORD_SIZE-1:0]            bypass_core_req_byteen;
+    wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]          bypass_core_req_data;
+    wire [NUM_REQS-1:0][CORE_TAG_WIDTH-1:0]       bypass_core_req_tag;
+    wire [NUM_REQS-1:0]                           bypass_core_req_ready;
+
+    wire [NUM_REQS-1:0]                          bypass_core_rsp_valid;
+    wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]         bypass_core_rsp_data;
+    wire [`CORE_REQ_TAG_COUNT-1:0][CORE_TAG_WIDTH-1:0] bypass_core_rsp_tag;
+    wire [`CORE_REQ_TAG_COUNT-1:0]               bypass_core_rsp_ready;
+
+    // wire                             bypass_dram_rsp_valid;
+    // wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_rsp_data;
+    // wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_rsp_tag;
+    // wire                             bypass_dram_rsp_ready;
+
     VX_cache_bypass #(
     // .CACHE_ID(CACHE_ID),
     .NUM_REQS(NUM_REQS),
@@ -176,14 +194,14 @@ module VX_cache #(
     .CACHE_LINE_SIZE(CACHE_LINE_SIZE),
     .NUM_BANKS(NUM_BANKS),
     // .NUM_PORTS(NUM_PORTS),
-    // .WORD_SIZE(WORD_SIZE),
+    .WORD_SIZE(WORD_SIZE),
     // .CREQ_SIZE(CREQ_SIZE),
-    // .MSHR_SIZE(MSHR_SIZE),
+    .MSHR_SIZE(MSHR_SIZE),
     // .DRSQ_SIZE(DRSQ_SIZE),
     // .DREQ_SIZE(DREQ_SIZE),
     // .WRITE_ENABLE(WRITE_ENABLE),
-    // .CORE_TAG_WIDTH(CORE_TAG_WIDTH),
-    // .CORE_TAG_ID_BITS(CORE_TAG_ID_BITS),
+    .CORE_TAG_WIDTH(CORE_TAG_WIDTH),
+    .CORE_TAG_ID_BITS(CORE_TAG_ID_BITS),
     .DRAM_TAG_WIDTH(DRAM_TAG_WIDTH)
     // .BANK_ADDR_OFFSET(BANK_ADDR_OFFSET),
     // .IN_ORDER_DRAM(IN_ORDER_DRAM)
@@ -191,18 +209,60 @@ module VX_cache #(
         .clk       (clk),
         .reset     (reset),
         .flush     (flush),
+
+
+        .bypass_core_req_valid(bypass_core_req_valid),
+        .bypass_core_req_rw(bypass_core_req_rw),
+        .bypass_core_req_addr(bypass_core_req_addr),
+        .bypass_core_req_byteen(bypass_core_req_byteen),
+        .bypass_core_req_data(bypass_core_req_data),
+        .bypass_core_req_tag(bypass_core_req_tag),
+        .bypass_core_req_ready(bypass_core_req_ready),
+
+        .core_req_valid(core_req_valid),
+        .core_req_rw(core_req_rw),
+        .core_req_addr(core_req_addr),
+        .core_req_byteen(core_req_byteen),
+        .core_req_data(core_req_data),
+        .core_req_tag(core_req_tag),
+        .core_req_ready(core_req_ready),
+
+
+        .bypass_core_rsp_valid(bypass_core_rsp_valid),
+        .bypass_core_rsp_data(bypass_core_rsp_data),
+        .bypass_core_rsp_tag(bypass_core_rsp_tag),
+        .bypass_core_rsp_ready(bypass_core_rsp_ready),
+
+        .core_rsp_valid(core_rsp_valid),
+        .core_rsp_data(core_rsp_data),
+        .core_rsp_tag(core_rsp_tag),
+        .core_rsp_ready(core_rsp_ready),
+
+
         .bypass_dram_req_rw(bypass_dram_req_rw),
         .bypass_dram_req_valid(bypass_dram_req_valid),
         .bypass_dram_req_byteen(bypass_dram_req_byteen),
         .bypass_dram_req_addr(bypass_dram_req_addr),
         .bypass_dram_req_data(bypass_dram_req_data),
         .bypass_dram_req_tag(bypass_dram_req_tag),
+
         .dram_req_valid(dram_req_valid),
         .dram_req_rw(dram_req_rw),
         .dram_req_byteen(dram_req_byteen),
         .dram_req_addr(dram_req_addr),
         .dram_req_data(dram_req_data),
         .dram_req_tag(dram_req_tag)
+
+
+        // .bypass_dram_rsp_valid(bypass_dram_rsp_valid),
+        // .bypass_dram_rsp_data(bypass_dram_rsp_data),
+        // .bypass_dram_rsp_tag(bypass_dram_rsp_tag),
+        // .bypass_dram_rsp_ready(bypass_dram_rsp_ready),
+
+        // .dram_rsp_valid(dram_rsp_valid),
+        // .dram_rsp_data(dram_rsp_data),
+        // .dram_rsp_tag(dram_rsp_tag),
+        // .dram_rsp_ready(dram_rsp_ready)
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -235,13 +295,13 @@ module VX_cache #(
     `ifdef PERF_ENABLE        
         .bank_stalls(perf_cache_if.bank_stalls),
     `endif     
-        .core_req_valid (core_req_valid),
-        .core_req_rw    (core_req_rw), 
-        .core_req_addr  (core_req_addr),
-        .core_req_byteen(core_req_byteen),
-        .core_req_data  (core_req_data),
-        .core_req_tag   (core_req_tag),
-        .core_req_ready (core_req_ready),
+        .core_req_valid (bypass_core_req_valid),
+        .core_req_rw    (bypass_core_req_rw), 
+        .core_req_addr  (bypass_core_req_addr),
+        .core_req_byteen(bypass_core_req_byteen),
+        .core_req_data  (bypass_core_req_data),
+        .core_req_tag   (bypass_core_req_tag),
+        .core_req_ready (bypass_core_req_ready),
         .per_bank_core_req_valid (per_bank_core_req_valid), 
         .per_bank_core_req_rw    (per_bank_core_req_rw),
         .per_bank_core_req_addr  (per_bank_core_req_addr),
@@ -412,10 +472,10 @@ module VX_cache #(
         .per_bank_core_rsp_tag   (per_bank_core_rsp_tag),
         .per_bank_core_rsp_tid   (per_bank_core_rsp_tid),   
         .per_bank_core_rsp_ready (per_bank_core_rsp_ready),
-        .core_rsp_valid          (core_rsp_valid),      
-        .core_rsp_tag            (core_rsp_tag),
-        .core_rsp_data           (core_rsp_data),  
-        .core_rsp_ready          (core_rsp_ready)
+        .core_rsp_valid          (bypass_core_rsp_valid),      
+        .core_rsp_tag            (bypass_core_rsp_tag),
+        .core_rsp_data           (bypass_core_rsp_data),  
+        .core_rsp_ready          (bypass_core_rsp_ready)
     ); 
 
     wire [NUM_BANKS-1:0][(`DRAM_ADDR_WIDTH + 1 + CACHE_LINE_SIZE + `CACHE_LINE_WIDTH)-1:0] data_in;
