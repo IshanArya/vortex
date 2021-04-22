@@ -45,6 +45,7 @@ module VX_cache_bypass #(
 
     // // in-order DRAN
     // parameter IN_ORDER_DRAM                 = 0
+    // parameter BYPASS_BASE_ADDR              = DIRECT_MEM_BASE_ADDR
 
 ) (
     // inputs and outputs
@@ -87,7 +88,7 @@ module VX_cache_bypass #(
     // DRAM request
     input wire                             bypass_dram_req_rw,
     input wire                             bypass_dram_req_valid,
-    input wire [CACHE_LINE_SIZE-1:0]       bypass_dram_req_byteen, 
+    input wire [CACHE_LINE_SIZE-1:0]       bypass_dram_req_byteen,
     input wire [`DRAM_ADDR_WIDTH-1:0]      bypass_dram_req_addr,
     input wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_req_data,
     input wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_req_tag,
@@ -97,10 +98,10 @@ module VX_cache_bypass #(
     output wire [CACHE_LINE_SIZE-1:0]       dram_req_byteen,
     output wire [`DRAM_ADDR_WIDTH-1:0]      dram_req_addr,
     output wire [`CACHE_LINE_WIDTH-1:0]     dram_req_data,
-    output wire [DRAM_TAG_WIDTH-1:0]        dram_req_tag
+    output wire [DRAM_TAG_WIDTH-1:0]        dram_req_tag,
 
 
-    // //DRAM Response
+    //DRAM Response
     // output  wire                             bypass_dram_rsp_valid,    
     // output  wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_rsp_data,
     // output  wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_rsp_tag,
@@ -111,13 +112,22 @@ module VX_cache_bypass #(
     // input  wire [DRAM_TAG_WIDTH-1:0]        dram_rsp_tag,
     // output wire                             dram_rsp_ready
 
+    output wire [`CACHE_LINE_WIDTH-1:0]               bypass_dram_rsp_data_qual,
+    output wire [DRAM_TAG_WIDTH-1:0]                  bypass_dram_rsp_tag_qual,
+
+    input wire [`CACHE_LINE_WIDTH-1:0]                dram_rsp_data_qual,
+    input wire [DRAM_TAG_WIDTH-1:0]                   dram_rsp_tag_qual
+
 );
     // assigns here
     // example flush_ctrl
     reg flush_enable;
     reg [`LINE_SELECT_BITS-1:0] flush_ctr;
 
-    assign bypass_core_req_valid = core_req_valid;
+    wire [NUM_REQS-1:0][31:0]     extended_core_req_addr;
+    reg  [NUM_REQS-1:0]            filtered_core_req_valid;
+
+    assign bypass_core_req_valid = filtered_core_req_valid;
     assign bypass_core_req_rw = core_req_rw;
     assign bypass_core_req_addr = core_req_addr;
     assign bypass_core_req_byteen = core_req_byteen;
@@ -137,10 +147,13 @@ module VX_cache_bypass #(
     assign dram_req_data = bypass_dram_req_data;
     assign dram_req_tag = bypass_dram_req_tag;
 
-    // assign bypass_dram_rsp_valid = dram_rsp_valid;
-    // assign bypass_dram_rsp_data = dram_rsp_data;
-    // assign bypass_dram_rsp_tag = dram_rsp_tag;
-    // assign dram_rsp_ready = bypass_dram_rsp_ready;
+    assign bypass_dram_rsp_data_qual = dram_rsp_data_qual;
+    assign bypass_dram_rsp_tag_qual = dram_rsp_tag_qual;
+    
+    for(genvar i = 0; i < NUM_REQS; i++) begin
+        assign extended_core_req_addr[i] = {core_req_addr[i], {(32 - `WORD_ADDR_WIDTH){1'b0}}};
+    end
+    
 
     always @(posedge clk) begin
         if (reset || flush) begin
@@ -152,6 +165,16 @@ module VX_cache_bypass #(
                     flush_enable <= 0;
                 end
                 flush_ctr <= flush_ctr + 1;            
+            end
+        end
+    end
+
+    always @* begin
+        for(integer i = 0; i < NUM_REQS; i++) begin
+            if (extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR) begin
+                filtered_core_req_valid[i] = 1'b0;
+            end else begin
+                filtered_core_req_valid[i] = core_req_valid[i];
             end
         end
     end
