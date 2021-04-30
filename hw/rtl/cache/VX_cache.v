@@ -178,6 +178,7 @@ module VX_cache #(
     wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]          bypass_core_req_data;
     wire [NUM_REQS-1:0][CORE_TAG_WIDTH-1:0]       bypass_core_req_tag;
     wire [NUM_REQS-1:0]                           bypass_core_req_ready;
+    wire                                          bypass_dram_req_ready;
 
     wire [NUM_REQS-1:0]                          bypass_core_rsp_valid;
     wire [NUM_REQS-1:0][`WORD_WIDTH-1:0]         bypass_core_rsp_data;
@@ -187,6 +188,7 @@ module VX_cache #(
 
     wire [`CACHE_LINE_WIDTH-1:0]                bypass_dram_rsp_data_qual;
     wire [DRAM_TAG_WIDTH-1:0]                   bypass_dram_rsp_tag_qual;
+    wire                                        bypass_drsq_empty;
 
     // wire                             bypass_dram_rsp_valid;
     // wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_rsp_data;
@@ -210,7 +212,7 @@ module VX_cache #(
     .CORE_TAG_ID_BITS(CORE_TAG_ID_BITS),
     .DRAM_TAG_WIDTH(DRAM_TAG_WIDTH)
     // .BYPASS_BASE_ADDR(BYPASS_BASE_ADDR)
-    // .BANK_ADDR_OFFSET(BANK_ADDR_OFFSET),
+    // .BANK_ADDR_OFFSET(BANK_ADDR_OFFSET)
     // .IN_ORDER_DRAM(IN_ORDER_DRAM)
     ) cache_bypass (
         .clk       (clk),
@@ -252,6 +254,7 @@ module VX_cache #(
         .bypass_dram_req_addr(bypass_dram_req_addr),
         .bypass_dram_req_data(bypass_dram_req_data),
         .bypass_dram_req_tag(bypass_dram_req_tag),
+        .bypass_dram_req_ready(bypass_dram_req_ready),
 
         .dram_req_valid(dram_req_valid),
         .dram_req_rw(dram_req_rw),
@@ -259,13 +262,16 @@ module VX_cache #(
         .dram_req_addr(dram_req_addr),
         .dram_req_data(dram_req_data),
         .dram_req_tag(dram_req_tag),
+        .dram_req_ready(dram_req_ready),
 
 
         .bypass_dram_rsp_data_qual(bypass_dram_rsp_data_qual),
         .bypass_dram_rsp_tag_qual(bypass_dram_rsp_tag_qual),
+        .bypass_drsq_empty(bypass_drsq_empty),
 
         .dram_rsp_data_qual(dram_rsp_data_qual),
-        .dram_rsp_tag_qual(dram_rsp_tag_qual)
+        .dram_rsp_tag_qual(dram_rsp_tag_qual),
+        .drsq_empty(drsq_empty)
         // .bypass_dram_rsp_valid(bypass_dram_rsp_valid),
         // .bypass_dram_rsp_data(bypass_dram_rsp_data),
         // .bypass_dram_rsp_tag(bypass_dram_rsp_tag),
@@ -390,10 +396,10 @@ module VX_cache #(
 
         // DRAM response
         if (NUM_BANKS == 1) begin
-            assign curr_bank_dram_rsp_valid = !drsq_empty;
+            assign curr_bank_dram_rsp_valid = !bypass_drsq_empty;
             assign curr_bank_dram_rsp_addr  = bypass_dram_rsp_tag_qual;
         end else begin
-            assign curr_bank_dram_rsp_valid = !drsq_empty && (`DRAM_ADDR_BANK(bypass_dram_rsp_tag_qual) == i);
+            assign curr_bank_dram_rsp_valid = !bypass_drsq_empty && (`DRAM_ADDR_BANK(bypass_dram_rsp_tag_qual) == i);
             assign curr_bank_dram_rsp_addr  = `DRAM_TO_LINE_ADDR(bypass_dram_rsp_tag_qual); 
         end
         assign curr_bank_dram_rsp_data    = bypass_dram_rsp_data_qual;
@@ -507,7 +513,7 @@ module VX_cache #(
         .ready_in  (per_bank_dram_req_ready),   
         .valid_out (bypass_dram_req_valid),   
         .data_out  ({bypass_dram_req_addr, bypass_dram_req_rw, bypass_dram_req_byteen, bypass_dram_req_data}),
-        .ready_out (dram_req_ready)
+        .ready_out (bypass_dram_req_ready)
     );
 
     assign bypass_dram_req_tag = bypass_dram_req_addr;

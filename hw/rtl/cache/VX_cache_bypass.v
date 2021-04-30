@@ -43,6 +43,9 @@ module VX_cache_bypass #(
     // // bank offset from beginning of index range
     // parameter BANK_ADDR_OFFSET              = 0,
 
+    // difference in core_addr and dram_addr width
+    // parameter DIFF_TAG_WIDTH               = DRAM_TAG_WIDTH - CORE_TAG_WIDTH
+
     // // in-order DRAN
     // parameter IN_ORDER_DRAM                 = 0
     // parameter BYPASS_BASE_ADDR              = DIRECT_MEM_BASE_ADDR
@@ -92,6 +95,7 @@ module VX_cache_bypass #(
     input wire [`DRAM_ADDR_WIDTH-1:0]      bypass_dram_req_addr,
     input wire [`CACHE_LINE_WIDTH-1:0]     bypass_dram_req_data,
     input wire [DRAM_TAG_WIDTH-1:0]        bypass_dram_req_tag,
+    output wire                            bypass_dram_req_ready,
 
     output wire                             dram_req_valid,
     output wire                             dram_req_rw,
@@ -99,6 +103,7 @@ module VX_cache_bypass #(
     output wire [`DRAM_ADDR_WIDTH-1:0]      dram_req_addr,
     output wire [`CACHE_LINE_WIDTH-1:0]     dram_req_data,
     output wire [DRAM_TAG_WIDTH-1:0]        dram_req_tag,
+    input  wire                             dram_req_ready,
 
 
     //DRAM Response
@@ -114,18 +119,29 @@ module VX_cache_bypass #(
 
     output wire [`CACHE_LINE_WIDTH-1:0]               bypass_dram_rsp_data_qual,
     output wire [DRAM_TAG_WIDTH-1:0]                  bypass_dram_rsp_tag_qual,
+    output wire                                       bypass_drsq_empty,
 
     input wire [`CACHE_LINE_WIDTH-1:0]                dram_rsp_data_qual,
-    input wire [DRAM_TAG_WIDTH-1:0]                   dram_rsp_tag_qual
+    input wire [DRAM_TAG_WIDTH-1:0]                   dram_rsp_tag_qual,
+    input wire                                        drsq_empty
 
 );
+    // localparam REQS_NUM_SIZE = $clog2(NUM_REQS) + 1;
+    localparam DIFF_ADDR_WIDTH = `WORD_ADDR_WIDTH - `DRAM_ADDR_WIDTH;
     // assigns here
     // example flush_ctrl
     reg flush_enable;
     reg [`LINE_SELECT_BITS-1:0] flush_ctr;
 
-    wire [NUM_REQS-1:0][31:0]     extended_core_req_addr;
+    wire [NUM_REQS-1:0][31:0]      extended_core_req_addr;
     reg  [NUM_REQS-1:0]            filtered_core_req_valid;
+    reg  [NUM_REQS-1:0]            is_bypass_request;
+    wire [NUM_REQS-1:0][`DRAM_ADDR_WIDTH-1:0]       aligned_core_req_addr;
+    wire dram_req_line_free = ~(|is_bypass_request) && dram_req_ready;
+    // wire dram_req_ready_to_fire = dram_req_ready && dram_req_valid;
+
+    integer bypass_req_num = -1;
+    reg[`DRAM_ADDR_WIDTH-1:0]      filtered_bypass_dram_addr;
 
     assign bypass_core_req_valid = filtered_core_req_valid;
     assign bypass_core_req_rw = core_req_rw;
@@ -143,15 +159,20 @@ module VX_cache_bypass #(
     assign dram_req_valid = bypass_dram_req_valid;
     assign dram_req_rw = bypass_dram_req_rw;
     assign dram_req_byteen = bypass_dram_req_byteen;
-    assign dram_req_addr = bypass_dram_req_addr;
+    assign dram_req_addr = filtered_bypass_dram_addr;
     assign dram_req_data = bypass_dram_req_data;
     assign dram_req_tag = bypass_dram_req_tag;
+    assign bypass_dram_req_ready = dram_req_line_free;
 
     assign bypass_dram_rsp_data_qual = dram_rsp_data_qual;
     assign bypass_dram_rsp_tag_qual = dram_rsp_tag_qual;
-    
+    assign bypass_drsq_empty = drsq_empty;
+
     for(genvar i = 0; i < NUM_REQS; i++) begin
         assign extended_core_req_addr[i] = {core_req_addr[i], {(32 - `WORD_ADDR_WIDTH){1'b0}}};
+        assign aligned_core_req_addr[i] = core_req_addr[i][`WORD_ADDR_WIDTH - 1:DIFF_ADDR_WIDTH];
+        assign filtered_core_req_valid[i] = extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR ? 1'b0 : core_req_valid[i];//extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR ? 1'b0 : 
+        assign is_bypass_request[i] = extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR;
     end
     
 
@@ -169,13 +190,28 @@ module VX_cache_bypass #(
         end
     end
 
-    always @* begin
-        for(integer i = 0; i < NUM_REQS; i++) begin
-            if (extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR) begin
-                filtered_core_req_valid[i] = 1'b0;
+    // always @* begin
+    //     for(integer i = 0; i < NUM_REQS; i++) begin
+    //         if (extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR && core_req_valid[i]) begin
+    //             filtered_core_req_valid[i] = 1'b0;
+    //             bypass_req_num = i;
+    //             $display("%t: aligned_core_req_addr: %d", $time, aligned_core_req_addr[i]);
+    //         end else begin
+    //             filtered_core_req_valid[i] = core_req_valid[i];
+    //         end
+    //     end
+    // end
+
+    always @(*) begin
+        if(|is_bypass_request) begin
+            if(DIFF_ADDR_WIDTH == 0) begin
+                $display("%t: of width aligned_core_req_addr: %d", $time, aligned_core_req_addr[bypass_req_num]);
             end else begin
-                filtered_core_req_valid[i] = core_req_valid[i];
+                $display("%t: not of width aligned_core_req_addr: %d", $time, aligned_core_req_addr[bypass_req_num]);
             end
+            filtered_bypass_dram_addr = bypass_dram_req_addr;
+        end else begin
+            filtered_bypass_dram_addr = bypass_dram_req_addr;
         end
     end
 
