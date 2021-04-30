@@ -198,9 +198,9 @@ module VX_cache #(
     VX_cache_bypass #(
     // .CACHE_ID(CACHE_ID),
     .NUM_REQS(NUM_REQS),
-    .CACHE_SIZE(CACHE_SIZE),
+    // .CACHE_SIZE(CACHE_SIZE),
     .CACHE_LINE_SIZE(CACHE_LINE_SIZE),
-    .NUM_BANKS(NUM_BANKS),
+    // .NUM_BANKS(NUM_BANKS),
     // .NUM_PORTS(NUM_PORTS),
     .WORD_SIZE(WORD_SIZE),
     // .CREQ_SIZE(CREQ_SIZE),
@@ -217,7 +217,6 @@ module VX_cache #(
     ) cache_bypass (
         .clk       (clk),
         .reset     (reset),
-        .flush     (flush),
 
 
         .bypass_core_req_valid(bypass_core_req_valid),
