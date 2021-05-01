@@ -196,7 +196,7 @@ module VX_cache #(
     // wire                             bypass_dram_rsp_ready;
 
     VX_cache_bypass #(
-    // .CACHE_ID(CACHE_ID),
+    .CACHE_ID(CACHE_ID),
     .NUM_REQS(NUM_REQS),
     // .CACHE_SIZE(CACHE_SIZE),
     .CACHE_LINE_SIZE(CACHE_LINE_SIZE),

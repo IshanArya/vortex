@@ -3,7 +3,7 @@
 module VX_cache_bypass #(
     // parameters
 
-    // parameter CACHE_ID                      = 0,
+    parameter CACHE_ID                      = 0,
 
     // Number of Word requests per cycle
     parameter NUM_REQS                      = 4,
@@ -131,6 +131,7 @@ module VX_cache_bypass #(
     // assigns here
 
     reg in_bypass_state = 0;
+    reg core_req_bypassed = 0;
     wire [NUM_REQS-1:0][31:0]      extended_core_req_addr;
     reg  [NUM_REQS-1:0]            filtered_core_req_valid;
     
@@ -145,6 +146,7 @@ module VX_cache_bypass #(
     wire [NUM_REQS-1:0][DRAM_TAG_WIDTH-1:0]         aligned_core_req_tag;
     wire [NUM_REQS-1:0][`CACHE_LINE_WIDTH-1:0]      aligned_core_req_data;
     wire [NUM_REQS-1:0][CACHE_LINE_SIZE-1:0]        aligned_core_req_byteen;
+    wire [NUM_REQS-1:0]                             aligned_core_req_ready;
 
     reg[`DRAM_ADDR_WIDTH-1:0]      filtered_dram_req_addr;
     reg                            filtered_dram_req_valid;
@@ -160,6 +162,7 @@ module VX_cache_bypass #(
     assign filtered_dram_req_tag = in_bypass_state ? aligned_core_req_tag[bypass_req_num] : bypass_dram_req_tag;
     assign filtered_dram_req_data = in_bypass_state ? aligned_core_req_data[bypass_req_num] : bypass_dram_req_data;
     assign filtered_dram_req_byteen = in_bypass_state ? aligned_core_req_byteen[bypass_req_num] : bypass_dram_req_byteen;
+    // assign filtered_core_req_ready = core_req_bypassed ? 
 
     assign bypass_core_req_valid = filtered_core_req_valid;
     assign bypass_core_req_rw = core_req_rw;
@@ -167,7 +170,7 @@ module VX_cache_bypass #(
     assign bypass_core_req_byteen = core_req_byteen;
     assign bypass_core_req_data = core_req_data;
     assign bypass_core_req_tag = core_req_tag;
-    assign core_req_ready = bypass_core_req_ready;
+    assign core_req_ready = aligned_core_req_ready;
 
     assign core_rsp_valid = bypass_core_rsp_valid;
     assign core_rsp_data = bypass_core_rsp_data;
@@ -191,35 +194,48 @@ module VX_cache_bypass #(
         assign is_bypass_request[i] = extended_core_req_addr[i] > `DIRECT_MEM_BASE_ADDR;
         assign filtered_core_req_valid[i] = is_bypass_request[i] ? 1'b0 : core_req_valid[i];
         assign aligned_core_req_addr[i] = core_req_addr[i][`WORD_ADDR_WIDTH - 1:DIFF_ADDR_WIDTH];
-        assign aligned_core_req_tag[i] = {{DIFF_TAG_WIDTH{1'b0}}, core_req_tag[i][CORE_TAG_ID_BITS - 1:0]};//{core_req_tag[i], {(DRAM_TAG_WIDTH - CORE_TAG_WIDTH){1'b0}}};
+        assign aligned_core_req_tag[i] = {3'b111,{(DIFF_TAG_WIDTH - 3){1'b0}}, core_req_tag[i][CORE_TAG_ID_BITS - 1:0]};
         if(DIFF_ADDR_WIDTH == 0) begin
             assign aligned_core_req_data[i] = core_req_data[i];
         end else begin
             assign aligned_core_req_data[i] = {{(`CACHE_LINE_WIDTH - `WORD_WIDTH){1'b0}}, core_req_data[i]};
         end
         assign aligned_core_req_byteen[i] = {CACHE_LINE_SIZE{1'b0}};
+
+        assign aligned_core_req_ready[i] = (core_req_bypassed && i == bypass_req_num) ? 1'b1 : bypass_core_req_ready[i];
     end
     
 
     always @(posedge clk) begin
         if (reset) begin
             in_bypass_state <= 0;
+            core_req_bypassed <= 0;
         end else begin
             if(~in_bypass_state)
                 in_bypass_state <= (|is_bypass_request) && dram_req_ready;
-            else
+            else if(~core_req_bypassed)
+                core_req_bypassed <= dram_req_is_read;
+            else begin
                 in_bypass_state <= ~dram_req_is_read;
+                core_req_bypassed <= 0;
+            end
+                
         end
     end
 
     always @(*) begin
+        $display("%t: Cache ID: %d", $time, CACHE_ID);
         $display("%t: Is Bypass Request OR'd: %d", $time, |is_bypass_request);
         $display("%t: Bypass State: %d", $time, in_bypass_state);
         $display("%t: Dram Req Valid: %d", $time, dram_req_valid);
         $display("%t: Dram Req Ready: %d", $time, dram_req_ready);
+        $display("%t: Dram Req Line Free: %d", $time, dram_req_line_free);
         $display("%t: Dram Req Tag: %d", $time, dram_req_tag);
         $display("%t: Dram Rsp Tag: %d", $time, dram_rsp_tag_qual);
-        
+        for(integer i = 0; i < NUM_REQS; i++) begin
+            $display("%t: Is Bypass Request: %d-%d", $time, i, is_bypass_request[i]);
+            $display("%t: Bypass Addr: %d-%d", $time, i, extended_core_req_addr[i]);
+        end
     end
     
 
